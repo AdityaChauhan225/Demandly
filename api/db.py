@@ -1,6 +1,7 @@
 import logging
 import re
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,24 +17,37 @@ SQLITE_DB_PATH = DATABASE_URL.replace("sqlite:///", "").replace("sqlite://", "")
 )
 
 _pg_pool = None
+_last_pg_attempt = 0.0
+_pg_retry_delay = 30.0
 
 def get_pg_pool():
-    global _pg_pool
-    if _pg_pool is None and not IS_SQLITE:
-        try:
-            from psycopg_pool import ConnectionPool
-            _pg_pool = ConnectionPool(
-                conninfo=DATABASE_URL,
-                min_size=1,
-                max_size=10,
-                timeout=5.0
-            )
-            _pg_pool.open()
-            logger.info("Connected to PostgreSQL via psycopg_pool")
-        except Exception as e:
-            logger.warning(f"Failed to connect to PostgreSQL: {e}. Will attempt SQLite fallback.")
-            _pg_pool = None
-    return _pg_pool
+    global _pg_pool, _last_pg_attempt
+    if _pg_pool is not None:
+        return _pg_pool
+    if IS_SQLITE:
+        return None
+
+    now = time.time()
+    if now - _last_pg_attempt < _pg_retry_delay:
+        return None
+
+    _last_pg_attempt = now
+    try:
+        from psycopg_pool import ConnectionPool
+        pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=1,
+            max_size=10,
+            timeout=2.0
+        )
+        pool.open()
+        _pg_pool = pool
+        logger.info("Connected to PostgreSQL via psycopg_pool")
+        return _pg_pool
+    except Exception as e:
+        logger.warning(f"Failed to connect to PostgreSQL ({e}). Using SQLite fallback ({SQLITE_DB_PATH}).")
+        _pg_pool = None
+        return None
 
 def get_sqlite_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(SQLITE_DB_PATH)
