@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: demandly-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: geodemand
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d geodemand"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: demandly-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demandly-api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/geodemand
+      REDIS_URL: redis://redis:6379/0
+      PRIVACY_K: 5
+      PRIVACY_EPSILON: 1.0
+      PRIVACY_SALT: geodemand-privacy-salt-change-in-production
+      CACHE_TTL_SECONDS: 300
+      MAX_CELLS: 5000
+      INGEST_API_KEY: geodemand-dev-ingest-key
+      ALLOWED_ORIGIN: "*"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demandly-worker
+    command: python -m ingest.rollup --schedule
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/geodemand
+      REDIS_URL: redis://redis:6379/0
+      PRIVACY_K: 5
+      PRIVACY_EPSILON: 1.0
+      PRIVACY_SALT: geodemand-privacy-salt-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: demandly-web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:

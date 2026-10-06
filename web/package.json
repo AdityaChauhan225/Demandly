@@ -1,0 +1,32 @@
+{
+  "name": "demandly-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@deck.gl/core": "^9.1.4",
+    "@deck.gl/geo-layers": "^9.1.4",
+    "@deck.gl/layers": "^9.1.4",
+    "@deck.gl/react": "^9.1.4",
+    "@deck.gl/widgets": "^9.4.0",
+    "h3-js": "^4.1.0",
+    "lucide-react": "^1.16.0",
+    "maplibre-gl": "^5.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}
